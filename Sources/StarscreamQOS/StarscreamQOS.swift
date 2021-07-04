@@ -33,8 +33,7 @@ public protocol StarscreamQOSType {
 final public class StarscreamQOS: StarscreamQOSType {
     /// State
     private var pingPongTimer: Timer?
-    private var counterTimer: Timer?
-    private var counter: TimeInterval = 0
+    private var pingDate: Date?
     private var isConnected: Bool = false
     /// Injections
     private let socket: WebSocket
@@ -131,26 +130,11 @@ private extension StarscreamQOS {
     }
     
     func handlePongEvent() {
-        guard isConnected else { return }
+        guard isConnected, let pingDate = pingDate else { return }
         // Update on QOS
-        let connectionQuality = quality(by: self.config.timeout, and: self.counter)
+        let connectionQuality = quality(by: pingDate)
         self.connectionQualityListener?(connectionQuality)
-        // Reser Steper
-        resetStepsCounter()
     }
-    
-    private func resetStepsCounter() {
-        counter = 0
-        
-        counterTimer?.invalidate()
-        counterTimer = Timer.scheduledTimer(timeInterval: 0.5,
-                                            target: self,
-                                            selector: #selector(incStepsCounter),
-                                            userInfo: nil,
-                                            repeats: true)
-    }
-    
-    @objc private func incStepsCounter() { counter += 0.5 }
     
     @objc private func sendPing() {
         socket.write(ping: config.data)
@@ -192,8 +176,6 @@ private extension StarscreamQOS {
     func invalidateTimers() {
         pingPongTimer?.invalidate()
         pingPongTimer = nil
-        counterTimer?.invalidate()
-        counterTimer = nil
         socket.disconnect()
     }
 }
@@ -206,27 +188,21 @@ extension StarscreamQOS: WebSocketDelegate {
     }
 }
 
-
 // MARK: - Quality calculator
-private func quality(by interval: TimeInterval, and steps: TimeInterval) -> QOS {
-    /* logic as follow:
-     1) 85% - 100% of timeout counts as `nonOperational`
-     2) 50& - 85% of timeout counts as `bad`
-     3) 35% - 50% of timeout counts as ok
-     4) 20% - 35% of timeout counts as `good`
-     5) 0% - 20% of timeout counts as `superb`
-     */
-    
-    switch steps/interval {
-    case 0...0.2:
+private func quality(by lastPingDate: Date) -> QOS {
+    let diff = lastPingDate.timeIntervalSinceNow
+    if diff < 5.0 {
         return .superb
-    case 0.2...0.35:
-        return .good
-    case 0.35...0.5:
-        return .ok
-    case 0.5...0.85:
-        return .bad
-    default:
-        return .nonOperational
     }
+    if diff < 8.0 {
+        return .good
+    }
+    if diff < 12.0 {
+        return .ok
+    }
+    if diff < 16.0 {
+        return .bad
+    }
+    return .nonOperational
+    
 }
