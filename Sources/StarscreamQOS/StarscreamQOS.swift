@@ -191,7 +191,7 @@ extension StarscreamQOS: WebSocketDelegate {
 
 // MARK: - Quality calculator
 private func quality(by lastPingDate: Date) -> QOS {
-    let diff = lastPingDate.timeIntervalSinceNow
+    let diff = -lastPingDate.timeIntervalSinceNow
     if diff < 5.0 {
         return .superb
     }
