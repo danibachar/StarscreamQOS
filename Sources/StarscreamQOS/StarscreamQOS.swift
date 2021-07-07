@@ -137,6 +137,7 @@ private extension StarscreamQOS {
     }
     
     @objc private func sendPing() {
+        pingDate = Date()
         socket.write(ping: config.data)
     }
 }
